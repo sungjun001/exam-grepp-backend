@@ -1930,5 +1930,5 @@ This project was inspired by a few projects, it's based on them with things chan
 
 ## 11. Contact
 
-Igor Magalhaes – [@igormagalhaesr](https://twitter.com/igormagalhaesr) – igormagalhaesr@gmail.com
-[github.com/igorbenav](https://github.com/igorbenav/)
+Sungjun, Hwang – sungjun.hw@gmail.com
+[github.com/sungjun001](https://github.com/sungjun001/)
