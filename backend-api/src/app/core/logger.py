@@ -6,7 +6,7 @@ LOG_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "logs")
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
-LOG_FILE_PATH = os.path.join(LOG_DIR, "app.log")
+LOG_FILE_PATH = os.path.join(LOG_DIR, "api.log")
 
 LOGGING_LEVEL = logging.INFO
 LOGGING_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
