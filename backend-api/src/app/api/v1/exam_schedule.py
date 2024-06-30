@@ -1,18 +1,21 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Query
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import UTC, datetime
+from sqlalchemy import and_, asc, desc
+
+from datetime import UTC, datetime, timedelta
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
-from ...core.exceptions.http_exceptions import ForbiddenException, NotFoundException
+from ...core.exceptions.http_exceptions import ForbiddenException, NotFoundException, DuplicateValueException, BadRequestException
 from ...core.utils.cache import cache
 from ...crud.crud_exam_schedule import crud_exam_schedule
 from ...crud.crud_users import crud_users
 from ...schemas.exam_schedule import ExamScheduleCreate, ExamScheduleCreateInternal, ExamScheduleRead, ExamScheduleUpdate
 from ...schemas.user import UserRead
+from ...models.exam_schedule import ExamScheduleStatus, ExamSchedule
 
 router = APIRouter(tags=["exam_schedule"])
 
@@ -30,6 +33,11 @@ async def write_exam_schedule(
 
     if current_user["id"] != db_user["id"]:
         raise ForbiddenException()
+    
+    db_exam_schedule = await crud_exam_schedule.get(db=db, schema_to_select=ExamScheduleRead, start_at=examSchedule.start_at, end_at=examSchedule.end_at, is_deleted=False)
+
+    if db_exam_schedule is not None and db_exam_schedule["id"] > 0 :
+        raise DuplicateValueException("Exam schedule with the same start and end time already exists")
 
     examSchedule_internal_dict = examSchedule.model_dump()
     examSchedule_internal_dict["created_by_user_id"] = db_user["id"]
@@ -43,30 +51,50 @@ async def write_exam_schedule(
 
 
 @router.get("/exam_schedule", response_model=PaginatedListResponse[ExamScheduleRead])
-# @cache(
-#     key_prefix="exam_schedule:page_{page}:items_per_page:{items_per_page}",
-#     expiration=60,
-# )
+@cache(
+    key_prefix="exam_schedule:page_{page}:items_per_page:{items_per_page}:status:{status}:order_by:{order_by}",
+    resource_id_name="page",
+    expiration=60,
+)
 async def read_exam_schedule(
     request: Request,
     db: Annotated[AsyncSession, Depends(async_get_db)],
+    status: ExamScheduleStatus = ExamScheduleStatus.AVAILABLE,
     page: int = 1,
     items_per_page: int = 10,
+    order_by: str = Query(default="start_at desc", regex="^(start_at|end_at|title|created_at|updated_at) (asc|desc)$"),
 ) -> dict:
     db_user = await crud_users.get(db=db, schema_to_select=UserRead, is_deleted=False)
     if not db_user:
         raise NotFoundException("User not found")
 
-    posts_data = await crud_exam_schedule.get_multi(
+    try:
+        order_field, order_direction = order_by.split()
+    except ValueError:
+        raise BadRequestException("Invalid order_by parameter format")
+
+    order_clause = desc(order_field) if order_direction == "desc" else asc(order_field)    
+
+    # 현재 날짜로부터 3일 이후의 날짜 계산
+    three_days_later = datetime.now(UTC) + timedelta(days=3)
+    
+    filter_clause = and_(
+        ExamSchedule.start_at >= three_days_later,
+        ExamSchedule.is_deleted == False,
+        ExamSchedule.status == status
+    )    
+
+    exam_schedule_data = await crud_exam_schedule.get_multi(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
         schema_to_select=ExamScheduleRead,
-        created_by_user_id=db_user["id"],
-        is_deleted=False,
+        filter_clause=filter_clause,
+        status=status,
+        order_by=order_clause,
     )
 
-    response: dict[str, Any] = paginated_response(crud_data=posts_data, page=page, items_per_page=items_per_page)
+    response: dict[str, Any] = paginated_response(crud_data=exam_schedule_data, page=page, items_per_page=items_per_page)
     return response
 
 

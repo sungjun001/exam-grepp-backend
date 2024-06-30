@@ -27,8 +27,6 @@ class UserReservationRead(BaseModel):
     status: ReservationStatus
     created_at: datetime
     updated_at: Optional[datetime]
-    deleted_at: Optional[datetime]
-    is_deleted: bool
 
     class Config:
         orm_mode = True

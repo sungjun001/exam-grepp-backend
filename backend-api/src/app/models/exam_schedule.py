@@ -2,13 +2,20 @@ import uuid as uuid_pkg
 from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, String, Integer, Boolean
+from sqlalchemy import DateTime, ForeignKey, String, Integer, Boolean, UniqueConstraint, Enum as SQLAEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..core.db.database import Base
 
 from sqlalchemy.orm import relationship
 
+import enum
+
+class ExamScheduleStatus(enum.Enum):
+    AVAILABLE = "AVAILABLE"
+    FULLY_BOOKED = "FULLY_BOOKED"
+    CANCELLED = "CANCELLED"
+    DELETED = "DELETED"
 
 class ExamSchedule(Base):
     __tablename__ = "exam_schedule"
@@ -25,6 +32,7 @@ class ExamSchedule(Base):
     max_users: Mapped[int] = mapped_column(Integer, default=50000)
     reserve_count: Mapped[int] = mapped_column(Integer, default=0)
     confirm_count: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[ExamScheduleStatus] = mapped_column(SQLAEnum(ExamScheduleStatus), default=ExamScheduleStatus.AVAILABLE, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default_factory=lambda: datetime.now(UTC))
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)
     deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), default=None)

@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ..core.schemas import PersistentDeletion, TimestampSchema, UUIDSchema
-
+from ..models.exam_schedule import ExamScheduleStatus
 
 class ExamScheduleBase(BaseModel):
     title: Annotated[str, Field(min_length=2, max_length=300, examples=["Programers Exam"])]
@@ -47,6 +47,7 @@ class ExamScheduleRead(BaseModel):
     created_by_user_id: int
     start_at: datetime 
     end_at: datetime
+    status: ExamScheduleStatus
     created_at: datetime  
 
 
@@ -73,6 +74,8 @@ class ExamScheduleUpdate(BaseModel):
     ]
     start_at: Annotated[datetime | None, Field(examples=["2023-06-27 15:30"], default=None)]
     end_at: Annotated[datetime | None, Field(examples=["2023-06-27 17:30"], default=None)]
+    status: Annotated[Optional[str], Field( default=ExamScheduleStatus.AVAILABLE, examples=[ExamScheduleStatus.FULLY_BOOKED, ExamScheduleStatus.CANCELLED, ExamScheduleStatus.DELETED])]
+
     media_url: Annotated[
         str | None,
         Field(pattern=r"^(https?|ftp)://[^\s/$.?#].[^\s]*$", examples=["https://www.examimageurl.com"], default=None),
