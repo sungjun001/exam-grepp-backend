@@ -1,11 +1,12 @@
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, UTC
-
+from sqlalchemy import and_, asc, desc, event
+from sqlalchemy.engine import Engine
 
 from ...api.dependencies import get_current_superuser, get_current_user
 from ...core.db.database import async_get_db
@@ -17,11 +18,17 @@ from ...crud.crud_user_reservation import crud_user_reservation
 from ...schemas.exam_schedule import ExamScheduleCreate, ExamScheduleCreateInternal, ExamScheduleRead, ExamScheduleUpdate
 from ...schemas.user import UserRead
 from ...schemas.user_reservation import UserReservationCreate, UserReservationRead, ReservationStatus
-from ...models.exam_schedule import ExamScheduleStatus
+from ...models.exam_schedule import ExamScheduleStatus, ExamSchedule
+from ...models.user_reservation import UserReservation
 
+import logging
 
 router = APIRouter(tags=["user_reservation"])
 
+
+# SQLAlchemy의 모든 SQL 쿼리를 출력하도록 로깅 설정
+logging.basicConfig()
+logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
 
 @router.post("/user/reservation", response_model=UserReservationRead, status_code=201)
 async def create_user_reservation(
@@ -29,21 +36,29 @@ async def create_user_reservation(
     current_user: UserRead = Depends(get_current_user),
     db: AsyncSession = Depends(async_get_db)
 ) -> UserReservationRead:
-    exam_schedule = await crud_exam_schedule.get(db=db, id=reservation_in.exam_schedule_id)
-    if not exam_schedule:
-        raise HTTPException(status_code=404, detail="ExamSchedule not found")
+    
+    try :
+        exam_schedule = await crud_exam_schedule.get(db=db, id=reservation_in.exam_schedule_id)
+        if not exam_schedule:
+            raise HTTPException(status_code=404, detail="ExamSchedule not found")
 
-    # 예약할 때의 시간 제한을 검사하는 코드
-    if datetime.now(UTC) >= exam_schedule["start_at"] - timedelta(days=3):
-        raise HTTPException(status_code=400, detail="Reservations can only be made up to 3 days before the exam starts.")    
+        reservation_check = await crud_user_reservation.get(db=db, user_id=current_user["id"], exam_schedule_id=exam_schedule["id"])
+        if reservation_check:
+            raise HTTPException(status_code=400, detail="User already has a reservation for this exam schedule")
 
-    if exam_schedule["confirm_count"] >= exam_schedule["max_users"]:
-        raise HTTPException(status_code=400, detail="Maximum number of confirmed reservations reached")
+        # 예약할 때의 시간 제한을 검사하는 코드
+        if datetime.now(UTC) >= exam_schedule["start_at"] - timedelta(days=3):
+            raise HTTPException(status_code=400, detail="Reservations can only be made up to 3 days before the exam starts.")    
 
-    reservation_in.user_id = current_user["id"]
-    reservation_in.exam_schedule_id = exam_schedule["id"]
-    reservation = await crud_user_reservation.create(db=db, object=reservation_in)
-    return reservation
+        if exam_schedule["confirm_count"] >= exam_schedule["max_users"]:
+            raise HTTPException(status_code=400, detail="Maximum number of confirmed reservations reached")
+
+        reservation_in.user_id = current_user["id"]
+        reservation_in.exam_schedule_id = exam_schedule["id"]
+        reservation = await crud_user_reservation.create(db=db, object=reservation_in)
+        return reservation
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 @router.patch("/user/reservation/{reservation_id}/status", response_model=UserReservationRead)
 async def update_user_reservation_status(
@@ -56,7 +71,7 @@ async def update_user_reservation_status(
     if not db_reservation:
         raise HTTPException(status_code=404, detail="UserReservation not found")
 
-    exam_schedule = await crud_exam_schedule.get(db=db, id=db_reservation.exam_schedule_id, status=ReservationStatus.AVAILABLE)
+    exam_schedule = await crud_exam_schedule.get(db=db, id=db_reservation["exam_schedule_id"], status=ExamScheduleStatus.AVAILABLE)
     if not exam_schedule:
         raise HTTPException(status_code=404, detail="ExamSchedule AVAILABLE not found")
 
@@ -78,30 +93,45 @@ async def update_user_reservation_status(
         exam_schedule["status"] = ExamScheduleStatus.AVAILABLE  
         
 
-    await crud_exam_schedule.update(db=db, object=exam_schedule, id=exam_schedule.id)
-    await crud_user_reservation.update(db=db, object=db_reservation, id=db_reservation.id)
+    await crud_exam_schedule.update(db=db, object=exam_schedule, id=exam_schedule["id"])
+    await crud_user_reservation.update(db=db, object=db_reservation, id=db_reservation["id"])
     
     return db_reservation
 
+@event.listens_for(Engine, "before_cursor_execute")
 @router.get("/my_reservations", response_model=PaginatedListResponse[UserReservationRead])
 async def read_my_reservations(
     request: Request,
     db: AsyncSession = Depends(async_get_db),
     current_user: UserRead = Depends(get_current_user),
+    exam_schedule_id: Optional[int] = None,
     page: int = 1,
     items_per_page: int = 10
 ) -> dict:
     """
     Retrieves paginated list of reservations for the current logged in user.
     """
-    db_reservation = await crud_user_reservation.get_multi(db=db, offset=page, limit=items_per_page, user_id=current_user.id)
 
-    response = paginated_response(
-        crud_data=db_reservation,
-        page=page,
-        items_per_page=items_per_page,
-        request=request
-    )
+    print ("my_reservations current_user : ", current_user["id"])
+    filter_clause = UserReservation.user_id == current_user["id"]
+
+
+    if exam_schedule_id:
+        filter_clause = and_(
+            UserReservation.user_id == current_user["id"],
+            UserReservation.exam_schedule_id == exam_schedule_id,
+        )    
+
+    db_reservation = await crud_user_reservation.get_multi(
+        db=db, 
+        offset=compute_offset(page, items_per_page),
+        schema_to_select=UserReservationRead,
+        limit=items_per_page, 
+        filter_clause=filter_clause,
+        )
+
+    response: dict[str, Any] = paginated_response(crud_data=db_reservation, page=page, items_per_page=items_per_page)    
+
     
     return response
 
