@@ -45,6 +45,9 @@ class ExamScheduleRead(BaseModel):
         Field(examples=["https://www.examimageurl.com"], default=None),
     ]
     created_by_user_id: int
+    max_users: int
+    reserve_count: int
+    confirm_count: int
     start_at: datetime 
     end_at: datetime
     status: ExamScheduleStatus

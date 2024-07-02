@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Optional
 
 from fastapi import APIRouter, Depends, Request, Query
 from fastcrud.paginated import PaginatedListResponse, compute_offset, paginated_response
@@ -59,7 +59,7 @@ async def write_exam_schedule(
 async def read_exam_schedule(
     request: Request,
     db: Annotated[AsyncSession, Depends(async_get_db)],
-    status: ExamScheduleStatus = ExamScheduleStatus.AVAILABLE,
+    status: Optional[ExamScheduleStatus] = ExamScheduleStatus.AVAILABLE,
     page: int = 1,
     items_per_page: int = 10,
     order_by: str = Query(default="start_at desc", regex="^(start_at|end_at|title|created_at|updated_at) (asc|desc)$"),
@@ -78,20 +78,20 @@ async def read_exam_schedule(
     # 현재 날짜로부터 3일 이후의 날짜 계산
     three_days_later = datetime.now(UTC) + timedelta(days=3)
     
-    filter_clause = and_(
-        ExamSchedule.start_at >= three_days_later,
-        ExamSchedule.is_deleted == False,
-        ExamSchedule.status == status
-    )    
+    # 필터 조건 설정
+    filter_conditions = {
+        "start_at__gte": three_days_later,
+        "is_deleted": False,
+        "status": status
+    }
 
     exam_schedule_data = await crud_exam_schedule.get_multi(
         db=db,
         offset=compute_offset(page, items_per_page),
         limit=items_per_page,
         schema_to_select=ExamScheduleRead,
-        filter_clause=filter_clause,
-        status=status,
         order_by=order_clause,
+        **filter_conditions
     )
 
     response: dict[str, Any] = paginated_response(crud_data=exam_schedule_data, page=page, items_per_page=items_per_page)

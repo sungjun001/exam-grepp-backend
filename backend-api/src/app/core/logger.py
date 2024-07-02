@@ -18,3 +18,6 @@ file_handler.setLevel(LOGGING_LEVEL)
 file_handler.setFormatter(logging.Formatter(LOGGING_FORMAT))
 
 logging.getLogger("").addHandler(file_handler)
+
+# SQLAlchemy의 모든 SQL 쿼리를 출력하도록 로깅 설정
+# logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
