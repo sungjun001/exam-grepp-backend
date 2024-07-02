@@ -9,7 +9,7 @@ from ..models.user_reservation import ReservationStatus
 class UserReservationBase(BaseModel):
     user_id: Annotated[int, Field()]
     exam_schedule_id: Annotated[int, Field()]
-    status: Annotated[ReservationStatus, Field(default=ReservationStatus.RESERVED, examples=["RESERVED", "CONFIRMED", "CANCELLED", "DELETED"])]
+    status: Annotated[ReservationStatus, Field(default=ReservationStatus.RESERVED, examples=[ReservationStatus.RESERVED, ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.DELETED])]
 
     @field_validator('status')
     def validate_status(cls, value):
@@ -34,7 +34,7 @@ class UserReservationRead(BaseModel):
 class UserReservationUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    status: Annotated[Optional[str], Field(default=None, examples=["CONFIRMED", "CANCELLED", "DELETED"])]
+    status: Annotated[Optional[str], Field(default=None, examples=[ReservationStatus.RESERVED, ReservationStatus.CONFIRMED, ReservationStatus.CANCELLED, ReservationStatus.DELETED])]
 
     @field_validator('status')
     def validate_status(cls, value, values, **kwargs):
