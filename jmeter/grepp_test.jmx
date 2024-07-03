@@ -1804,7 +1804,7 @@ if (id) {
         </kg.apc.jmeter.vizualizers.CorrectedResultCollector>
         <hashTree/>
       </hashTree>
-      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Schedule Test Group" enabled="true">
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Schedule Test Group">
         <intProp name="ThreadGroup.num_threads">1</intProp>
         <intProp name="ThreadGroup.ramp_time">1</intProp>
         <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
@@ -1899,7 +1899,7 @@ def now = LocalDateTime.now()
 //
 //// JMeter 변수에 저장
 
-def initialDate = &quot;2024-07-01 09:00&quot;
+def initialDate = &quot;2024-08-01 09:00&quot;
 
 vars.put(&quot;initialDate&quot;, initialDate)
 vars.put(&quot;currentInterval&quot;, &quot;0&quot;)
@@ -2382,7 +2382,7 @@ if (currentDateTime.hour &gt;= 15) {
         <boolProp name="ThreadGroup.same_user_on_next_iteration">false</boolProp>
         <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
         <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller">
-          <stringProp name="LoopController.loops">10</stringProp>
+          <stringProp name="LoopController.loops">1000</stringProp>
           <boolProp name="LoopController.continue_forever">false</boolProp>
         </elementProp>
       </ThreadGroup>
