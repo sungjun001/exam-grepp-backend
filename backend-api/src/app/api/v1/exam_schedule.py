@@ -19,6 +19,8 @@ from ...models.exam_schedule import ExamScheduleStatus, ExamSchedule
 
 router = APIRouter(tags=["exam_schedule"])
 
+import logging
+
 
 @router.post("/exam_schedule", response_model=ExamScheduleRead, status_code=201)
 async def write_exam_schedule(
@@ -27,20 +29,14 @@ async def write_exam_schedule(
     current_user: Annotated[UserRead, Depends(get_current_superuser)],
     db: Annotated[AsyncSession, Depends(async_get_db)],
 ) -> ExamScheduleRead:
-    db_user = await crud_users.get(db=db, schema_to_select=UserRead, UserRead=current_user, is_deleted=False)
-    if db_user is None:
-        raise NotFoundException("User not found")
-
-    if current_user["id"] != db_user["id"]:
-        raise ForbiddenException()
-    
+        
     db_exam_schedule = await crud_exam_schedule.get(db=db, schema_to_select=ExamScheduleRead, start_at=examSchedule.start_at, end_at=examSchedule.end_at, is_deleted=False)
 
     if db_exam_schedule is not None and db_exam_schedule["id"] > 0 :
         raise DuplicateValueException("Exam schedule with the same start and end time already exists")
 
     examSchedule_internal_dict = examSchedule.model_dump()
-    examSchedule_internal_dict["created_by_user_id"] = db_user["id"]
+    examSchedule_internal_dict["created_by_user_id"] = current_user["id"]
 
     ## examSchedule_internal_dict 로그 출력
     print ( examSchedule_internal_dict)
