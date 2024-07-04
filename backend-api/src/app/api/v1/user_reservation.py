@@ -95,6 +95,12 @@ async def update_user_reservation_status(
             exam_schedule["reserve_count"] += 1
     elif db_reservation["status"] == status:
         return db_reservation
+    
+    if exam_schedule["reserve_count"] < 0:
+        exam_schedule["reserve_count"] = 0
+        
+    if exam_schedule["confirm_count"] < 0:
+        exam_schedule["confirm_count"] = 0 
 
     db_reservation["status"] = status
 
